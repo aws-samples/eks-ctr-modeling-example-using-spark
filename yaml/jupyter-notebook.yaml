@@ -1,2 +1,58 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
+# create notebook pod, deployment and service
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jupyter-svc
+  namespace: notebook
+spec:
+  ports:
+    - name: notebook
+      port: 80
+      targetPort: 8888
+      protocol: TCP
+    - name: spark
+      port: 4040
+      targetPort: 4040
+      protocol: TCP
+  type: NodePort
+  selector:
+    app: jupyter-pod
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: jupyter-svc-deployment
+  name: jupyter-svc-deployment
+  namespace: notebook
+spec:
+  selector:
+    matchLabels:
+      app: jupyter-pod
+  template:
+    metadata:
+      annotations:
+        kubernetes.io/psp: eks.privileged
+        sidecar.istio.io/inject: "false"
+      labels:
+        app: jupyter-pod
+      name: jupyter-pod
+      namespace: notebook
+    spec:
+      serviceAccount: spark
+      containers:
+      - env:
+        image: <REPLACE_WITH_JUPYTER_DOCKER_IMG>
+        imagePullPolicy: Always
+        name: jupyter-notebook
+        ports:
+          - containerPort: 8888
+            name: notebook-port
+            protocol: TCP
+        resources:
+          requests:
+            cpu: 4
+            memory: 24Gi
